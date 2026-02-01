@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { open } from '@tauri-apps/plugin-dialog'
+import { useState, useRef } from 'react'
 
 interface FileData {
   name: string
@@ -10,40 +9,22 @@ interface FileData {
 export function Upload() {
   const [files, setFiles] = useState<FileData[]>([])
   const [uploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSelectFiles = async () => {
-    try {
-      const selected = await open({
-        multiple: true,
-        filters: [
-          {
-            name: 'Images',
-            extensions: ['jpg', 'jpeg', 'png', 'webp', 'JPG', 'JPEG', 'PNG', 'WEBP']
-          }
-        ]
-      })
+  const handleSelectFiles = () => {
+    fileInputRef.current?.click()
+  }
 
-      if (selected) {
-        let selectedPaths: string[] = []
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || [])
 
-        if (typeof selected === 'string') {
-          selectedPaths = [selected]
-        } else if (Array.isArray(selected)) {
-          selectedPaths = selected
-        }
+    const fileObjects: FileData[] = selectedFiles.map(file => ({
+      name: file.name,
+      path: (file as any).path || file.name,
+      size: file.size
+    }))
 
-        const fileObjects: FileData[] = selectedPaths.map(path => ({
-          name: path.split('/').pop() || path.split('\\').pop() || 'unknown',
-          path: path,
-          size: 0
-        }))
-
-        setFiles([...files, ...fileObjects])
-      }
-    } catch (error) {
-      console.error('选择文件失败:', error)
-      alert('选择文件失败')
-    }
+    setFiles([...files, ...fileObjects])
   }
 
   const handleUpload = async () => {
@@ -82,18 +63,23 @@ export function Upload() {
       <div
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onClick={handleSelectFiles}
         className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
         <p className="text-muted-foreground mb-4">
           拖拽图片到此处或点击选择文件
         </p>
-        <button
-          onClick={handleSelectFiles}
-          disabled={uploading}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          选择文件
-        </button>
+        <p className="text-sm text-muted-foreground">
+          支持 JPG、PNG、WebP 格式
+        </p>
       </div>
 
       {files.length > 0 && (
