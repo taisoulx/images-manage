@@ -16,6 +16,7 @@ fn main() {
             commands::login,
             commands::get_all_images,
             commands::search_images,
+            commands::upload_image,
         ])
         .setup(|app| {
             #[cfg(desktop)]

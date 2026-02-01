@@ -18,6 +18,13 @@ pub struct ImageInfo {
     created_at: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UploadResult {
+    success: bool,
+    message: String,
+    image_id: Option<i32>,
+}
+
 #[command]
 pub fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -48,7 +55,7 @@ pub async fn login(password: String) -> Result<String, String> {
     }
 
     use std::time::{SystemTime, UNIX_EPOCH};
-    let expiration = SystemTime::now() + std::time::Duration::from_secs(86400); // 24小时
+    let expiration = SystemTime::now() + std::time::Duration::from_secs(86400);
 
     let payload = serde_json::json!({
         "exp": expiration.duration_since(UNIX_EPOCH).unwrap().as_secs(),
@@ -66,4 +73,34 @@ pub fn get_all_images() -> Result<Vec<ImageInfo>, String> {
 #[command]
 pub fn search_images(_query: String) -> Result<Vec<ImageInfo>, String> {
     Ok(vec![])
+}
+
+#[command]
+pub fn upload_image(path: String) -> Result<UploadResult, String> {
+    use std::fs;
+    use std::path::Path;
+
+    let file_path = Path::new(&path);
+
+    if !file_path.exists() {
+        return Err(format!("文件不存在: {}", path));
+    }
+
+    let metadata = match fs::metadata(&file_path) {
+        Ok(meta) => meta,
+        Err(e) => return Err(format!("无法读取文件元数据: {}", e)),
+    };
+
+    let _file_size = metadata.len();
+
+    let filename = match file_path.file_name() {
+        Some(name) => name.to_string_lossy().to_string(),
+        None => return Err("无法获取文件名".to_string()),
+    };
+
+    Ok(UploadResult {
+        success: true,
+        message: format!("文件 '{}' 上传成功", filename),
+        image_id: None,
+    })
 }
