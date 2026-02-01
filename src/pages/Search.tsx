@@ -1,26 +1,58 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { useInView } from 'react-intersection-observer'
+import { ImageCard } from '@/components/ImageCard'
 
 export function Search() {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [results, setResults] = useState<any[]>([])
+  const [displayedResults, setDisplayedResults] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const RESULTS_PER_PAGE = 20
+  const { ref, inView } = useInView({
+    threshold: 0,
+    rootMargin: '100px',
+  })
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!query.trim()) return
+
     setIsSearching(true)
+    setPage(1)
 
     try {
       const searchResults = await invoke<any[]>('search_images', {
         query: query,
       })
       setResults(searchResults)
+      setDisplayedResults(searchResults.slice(0, RESULTS_PER_PAGE))
+      setHasMore(searchResults.length > RESULTS_PER_PAGE)
     } catch (error) {
       console.error('搜索失败:', error)
+      setResults([])
+      setDisplayedResults([])
+      setHasMore(false)
     } finally {
       setIsSearching(false)
     }
   }
+
+  useEffect(() => {
+    if (inView && hasMore) {
+      setPage((prevPage) => prevPage + 1)
+    }
+  }, [inView, hasMore])
+
+  useEffect(() => {
+    const start = (page - 1) * RESULTS_PER_PAGE
+    const end = start + RESULTS_PER_PAGE
+    const newResults = results.slice(0, end)
+    setDisplayedResults(newResults)
+    setHasMore(end < results.length)
+  }, [page, results])
 
   return (
     <div className="space-y-6">
@@ -52,35 +84,30 @@ export function Search() {
           </button>
         </form>
 
-        {results.length > 0 && (
+        {displayedResults.length > 0 && (
           <div className="border-t border-border pt-6 mt-6">
             <h2 className="text-xl font-semibold mb-4">
-              搜索结果 ({results.length} 条)
+              搜索结果 ({results.length} 条，已显示 {displayedResults.length} 条)
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {results.map((result: any, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-muted rounded-md border border-border hover:border-primary transition-colors"
-                >
-                  <div className="aspect-square bg-background rounded mb-3 flex items-center justify-center">
-                    {result.thumbnail_path ? (
-                      <img
-                        src={result.thumbnail_path}
-                        alt={result.filename}
-                        className="w-full h-full object-cover rounded"
-                      />
-                    ) : (
-                      <span className="text-4xl">📷</span>
-                    )}
-                  </div>
-                  <p className="text-sm font-medium truncate">{result.filename}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {(Number(result.size) / 1024).toFixed(2)} KB
-                  </p>
-                </div>
+              {displayedResults.map((result: any, index) => (
+                <ImageCard
+                  key={result.id || index}
+                  image={result}
+                />
               ))}
+              {hasMore && (
+                <div ref={ref} className="col-span-full flex justify-center py-8">
+                  <div className="text-muted-foreground">加载更多...</div>
+                </div>
+              )}
             </div>
+          </div>
+        )}
+
+        {!isSearching && query && displayedResults.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            没有找到匹配的图片
           </div>
         )}
       </div>
