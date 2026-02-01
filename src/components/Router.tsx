@@ -4,6 +4,7 @@ import { Home } from '@/pages/Home'
 import { Gallery } from '@/pages/Gallery'
 import { Search } from '@/pages/Search'
 import { Upload } from '@/pages/Upload'
+import { Login } from '@/pages/Login'
 
 const router = createBrowserRouter([
   {
@@ -21,6 +22,10 @@ const router = createBrowserRouter([
   {
     path: '/upload',
     element: <Layout><Upload /></Layout>,
+  },
+  {
+    path: '/login',
+    element: <Layout><Login /></Layout>,
   },
 ])
 

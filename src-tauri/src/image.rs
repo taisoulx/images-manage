@@ -27,6 +27,6 @@ pub fn validate_image_format(path: &str) -> Result<bool, String> {
     }
 }
 
-pub fn get_image_dimensions(path: &str) -> Option<(u32, u32)> {
+pub fn get_image_dimensions(_path: &str) -> Option<(u32, u32)> {
     None
 }
