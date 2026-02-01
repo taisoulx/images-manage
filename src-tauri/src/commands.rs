@@ -8,6 +8,16 @@ pub struct SystemInfo {
     rust_version: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ImageInfo {
+    id: Option<i32>,
+    filename: String,
+    path: String,
+    size: i64,
+    thumbnail_path: Option<String>,
+    created_at: Option<String>,
+}
+
 #[command]
 pub fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -46,4 +56,14 @@ pub async fn login(password: String) -> Result<String, String> {
     });
 
     Ok(serde_json::to_string(&payload).map_err(|e| e.to_string())?)
+}
+
+#[command]
+pub fn get_all_images() -> Result<Vec<ImageInfo>, String> {
+    Ok(vec![])
+}
+
+#[command]
+pub fn search_images(_query: String) -> Result<Vec<ImageInfo>, String> {
+    Ok(vec![])
 }

@@ -14,6 +14,8 @@ fn main() {
             commands::get_system_info,
             commands::validate_image,
             commands::login,
+            commands::get_all_images,
+            commands::search_images,
         ])
         .setup(|app| {
             #[cfg(desktop)]
