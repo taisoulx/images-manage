@@ -3,15 +3,22 @@ import { useState } from 'react'
 export function Search() {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [results, setResults] = useState<string[]>([])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSearching(true)
     
-    setTimeout(() => {
+    try {
+      const searchResults = await invoke<string[]>('search_images', {
+        query: query,
+      })
+      setResults(searchResults)
+    } catch (error) {
+      console.error('搜索失败:', error)
+    } finally {
       setIsSearching(false)
-      console.log('搜索:', query)
-    }, 1000)
+    }
   }
 
   return (
@@ -44,15 +51,18 @@ export function Search() {
           </button>
         </form>
 
-        <div className="border-t border-border pt-6 mt-6">
-          <h2 className="text-xl font-semibold mb-4">搜索提示</h2>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>• 支持中文搜索</li>
-            <li>• 可以搜索文件名、标签和描述</li>
-            <li>• 支持相机型号筛选</li>
-            <li>• 支持GPS位置搜索</li>
-          </ul>
-        </div>
+        {results.length > 0 && (
+          <div className="border-t border-border pt-6 mt-6">
+            <h2 className="text-xl font-semibold mb-4">搜索结果</h2>
+            <div className="space-y-2">
+              {results.map((result, index) => (
+                <div key={index} className="p-4 bg-muted rounded-md border border-border">
+                  {result}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

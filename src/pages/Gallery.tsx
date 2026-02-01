@@ -1,7 +1,24 @@
 import { useAppStore } from '@/stores/appStore'
+import { useEffect } from 'react'
 
 export function Gallery() {
-  const { images, isLoading } = useAppStore()
+  const { images, setImages, setIsLoading } = useAppStore()
+
+  useEffect(() => {
+    const loadImages = async () => {
+      setIsLoading(true)
+      try {
+        const imageList = await invoke<any[]>('get_all_images')
+        setImages(imageList)
+      } catch (error) {
+        console.error('加载图片失败:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadImages()
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -12,7 +29,7 @@ export function Gallery() {
         </span>
       </div>
 
-      {isLoading ? (
+      {useAppStore.getState().isLoading ? (
         <div className="text-center py-12 text-muted-foreground">
           加载中...
         </div>
@@ -22,15 +39,15 @@ export function Gallery() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {images.map((image) => (
+          {images.map((image: any) => (
             <div
               key={image.id}
               className="group relative overflow-hidden rounded-lg border border-border bg-card hover:border-primary transition-all cursor-pointer"
             >
               <div className="aspect-square bg-muted flex items-center justify-center">
-                {image.thumbnailPath ? (
+                {image.thumbnail_path ? (
                   <img
-                    src={image.thumbnailPath}
+                    src={image.thumbnail_path}
                     alt={image.filename}
                     className="w-full h-full object-cover"
                   />

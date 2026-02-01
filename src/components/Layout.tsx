@@ -35,13 +35,19 @@ export function Layout() {
               >
                 搜索
               </Link>
+              <Link
+                to="/upload"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  isActive('/upload') ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                上传
+              </Link>
             </div>
           </div>
-        </div>
-      </nav>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+        </nav>
       </main>
+      <Outlet />
     </div>
   )
 }
