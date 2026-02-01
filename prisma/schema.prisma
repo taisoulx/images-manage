@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Image {
+  id            Int        @id @default(autoincrement())
+  filename      String
+  path          String     @unique
+  thumbnailPath String?    @map("thumbnail_path")
+  size          BigInt     @default(0)
+  hash          String     @unique
+  description   String?
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  metadata      ImageMetadata?
+  tags         ImageTag[]
+  @@map("images")
+}
+
+model ImageMetadata {
+  id              Int       @id @default(autoincrement())
+  imageId         Int       @map("image_id")
+  image           Image     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  exifMake        String?   @map("exif_make")
+  exifModel       String?   @map("exif_model")
+  exifIso         Int?      @map("exif_iso")
+  exifAperture    Float?    @map("exif_aperture")
+  exifExposureTime String?   @map("exif_exposure_time")
+  gpsLatitude     Float?    @map("gps_latitude")
+  gpsLongitude    Float?    @map("gps_longitude")
+  gpsAltitude     Float?    @map("gps_altitude")
+  description     String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@unique([imageId])
+  @@map("image_metadata")
+}
+
+model ImageTag {
+  id        Int      @id @default(autoincrement())
+  imageId   Int      @map("image_id")
+  image     Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  tag       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([imageId])
+  @@index([tag])
+  @@map("image_tags")
+}
+
+// 创建FTS5虚拟表用于全文搜索
+// 需要通过自定义SQL迁移创建
