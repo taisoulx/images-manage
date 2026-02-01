@@ -1,14 +1,41 @@
 import { logger } from '@/utils/logger'
 
+let invokeCache: ((command: string, args?: Record<string, any>) => Promise<any>) | null = null
+
+async function getInvoke() {
+  if (invokeCache) {
+    return invokeCache
+  }
+
+  try {
+    const tauriCore = await import('@tauri-apps/api/core')
+    invokeCache = tauriCore.invoke || null
+
+    if (!invokeCache) {
+      logger.error('Tauri invoke API is not available in imported module', tauriCore)
+    }
+
+    return invokeCache
+  } catch (error) {
+    logger.error('Failed to import Tauri core API', error)
+    throw new Error('Tauri API is not available. Make sure app is running in Tauri environment.')
+  }
+}
+
 export async function invokeWithErrorHandling<T>(
   command: string,
   args?: Record<string, any>,
   errorMessage?: string
 ): Promise<T> {
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
+    const invoke = await getInvoke()
+
+    if (!invoke) {
+      throw new Error('Tauri invoke API is not available. Make sure app is running in Tauri environment.')
+    }
+
     logger.info(`Invoking command: ${command}`, args)
-    const result = await invoke<T>(command, args)
+    const result = await invoke(command, args) as T
     logger.info(`Command ${command} succeeded`)
     return result
   } catch (error) {
