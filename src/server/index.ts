@@ -15,11 +15,11 @@ await fastify.register(fastifyStatic, {
   prefix: '/',
 })
 
-fastify.get('/health', async (request, reply) => {
+fastify.get('/health', async () => {
   return { status: 'ok', timestamp: Date.now() }
 })
 
-fastify.get('/api/health', async (request, reply) => {
+fastify.get('/api/health', async () => {
   return { status: 'ok', timestamp: Date.now() }
 })
 

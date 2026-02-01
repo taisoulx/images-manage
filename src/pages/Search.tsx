@@ -1,16 +1,17 @@
 import { useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 export function Search() {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
-  const [results, setResults] = useState<string[]>([])
+  const [results, setResults] = useState<any[]>([])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSearching(true)
-    
+
     try {
-      const searchResults = await invoke<string[]>('search_images', {
+      const searchResults = await invoke<any[]>('search_images', {
         query: query,
       })
       setResults(searchResults)
@@ -23,8 +24,8 @@ export function Search() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h1 className="text-3xl font-bold mb-6">搜索图片</h1>
+      <div className="bg-card rounded-lg border border-border p-4 sm:p-6">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6">搜索图片</h1>
 
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
@@ -53,11 +54,30 @@ export function Search() {
 
         {results.length > 0 && (
           <div className="border-t border-border pt-6 mt-6">
-            <h2 className="text-xl font-semibold mb-4">搜索结果</h2>
-            <div className="space-y-2">
-              {results.map((result, index) => (
-                <div key={index} className="p-4 bg-muted rounded-md border border-border">
-                  {result}
+            <h2 className="text-xl font-semibold mb-4">
+              搜索结果 ({results.length} 条)
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {results.map((result: any, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-muted rounded-md border border-border hover:border-primary transition-colors"
+                >
+                  <div className="aspect-square bg-background rounded mb-3 flex items-center justify-center">
+                    {result.thumbnail_path ? (
+                      <img
+                        src={result.thumbnail_path}
+                        alt={result.filename}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    ) : (
+                      <span className="text-4xl">📷</span>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium truncate">{result.filename}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(Number(result.size) / 1024).toFixed(2)} KB
+                  </p>
                 </div>
               ))}
             </div>

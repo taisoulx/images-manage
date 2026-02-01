@@ -9,24 +9,30 @@ import { Login } from '@/pages/Login'
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <Layout><Home /></Layout>,
-  },
-  {
-    path: '/gallery',
-    element: <Layout><Gallery /></Layout>,
-  },
-  {
-    path: '/search',
-    element: <Layout><Search /></Layout>,
-  },
-  {
-    path: '/upload',
-    element: <Layout><Upload /></Layout>,
-  },
-  {
-    path: '/login',
-    element: <Layout><Login /></Layout>,
-  },
+    element: <Layout />,
+    children: [
+      {
+        index: true,
+        element: <Home />
+      },
+      {
+        path: '/gallery',
+        element: <Gallery />
+      },
+      {
+        path: '/search',
+        element: <Search />
+      },
+      {
+        path: '/upload',
+        element: <Upload />
+      },
+      {
+        path: '/login',
+        element: <Login />
+      }
+    ]
+  }
 ])
 
 export function AppRouter() {

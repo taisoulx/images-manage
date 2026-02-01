@@ -1,5 +1,6 @@
 import { useAppStore } from '@/stores/appStore'
 import { useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 export function Gallery() {
   const { images, setImages, setIsLoading } = useAppStore()
