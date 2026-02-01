@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invokeWithErrorHandling } from '@/utils/errorHandler'
 
 interface FileData {
   name: string
@@ -27,7 +27,7 @@ export function Upload() {
       let uploaded = 0
 
       for (const file of files) {
-        await invoke('upload_image', { path: (file as any).path })
+        await invokeWithErrorHandling('upload_image', { path: (file as any).path })
         uploaded++
         setProgress((uploaded / total) * 100)
       }

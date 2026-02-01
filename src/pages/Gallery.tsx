@@ -1,8 +1,8 @@
 import { useAppStore } from '@/stores/appStore'
 import { useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { useInView } from 'react-intersection-observer'
 import { ImageCard } from '@/components/ImageCard'
+import { invokeWithErrorHandling } from '@/utils/errorHandler'
 
 const ITEMS_PER_PAGE = 20
 
@@ -20,7 +20,7 @@ export function Gallery() {
     const loadImages = async () => {
       setIsLoading(true)
       try {
-        const imageList = await invoke<any[]>('get_all_images')
+        const imageList = await invokeWithErrorHandling<any[]>('get_all_images')
         setImages(imageList)
         setDisplayedImages(imageList.slice(0, ITEMS_PER_PAGE))
         setHasMore(imageList.length > ITEMS_PER_PAGE)

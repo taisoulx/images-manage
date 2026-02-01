@@ -1,6 +1,6 @@
 import { useAppStore } from '@/stores/appStore'
-import { invoke } from '@tauri-apps/api/core'
 import { Link } from 'react-router-dom'
+import { invokeWithErrorHandling } from '@/utils/errorHandler'
 
 export function Home() {
   const { setIsLoading } = useAppStore()
@@ -8,7 +8,7 @@ export function Home() {
   const handleTest = async () => {
     setIsLoading(true)
     try {
-      await invoke('ping')
+      await invokeWithErrorHandling('ping')
       alert('后端连接成功!')
     } catch (error) {
       console.error('测试失败:', error)

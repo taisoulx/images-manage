@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invokeWithErrorHandling } from '@/utils/errorHandler'
 
 export function Login() {
   const [password, setPassword] = useState('')
@@ -12,7 +12,7 @@ export function Login() {
     setError('')
 
     try {
-      const result = await invoke<{ token: string }>('login', { password })
+      const result = await invokeWithErrorHandling<{ token: string }>('login', { password })
       localStorage.setItem('token', result.token)
       alert('登录成功！')
       setPassword('')

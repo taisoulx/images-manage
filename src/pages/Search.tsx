@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { useInView } from 'react-intersection-observer'
 import { ImageCard } from '@/components/ImageCard'
+import { invokeWithErrorHandling } from '@/utils/errorHandler'
 
 export function Search() {
   const [query, setQuery] = useState('')
@@ -24,7 +24,7 @@ export function Search() {
     setPage(1)
 
     try {
-      const searchResults = await invoke<any[]>('search_images', {
+      const searchResults = await invokeWithErrorHandling<any[]>('search_images', {
         query: query,
       })
       setResults(searchResults)
