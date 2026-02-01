@@ -1,3 +1,4 @@
+use crate::image::{validate_image_format, ImageMetadata};
 use serde::{Deserialize, Serialize};
 use tauri::command;
 
@@ -17,6 +18,11 @@ pub fn get_system_info() -> SystemInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         rust_version: env!("CARGO_PKG_RUST_VERSION").to_string(),
     }
+}
+
+#[command]
+pub fn validate_image(path: String) -> Result<bool, String> {
+    validate_image_format(&path)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
