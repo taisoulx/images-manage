@@ -1,6 +1,7 @@
 import { logger } from '@/utils/logger'
 
 let invokeCache: ((command: string, args?: Record<string, any>) => Promise<any>) | null = null
+let isTauriEnvironment = false
 
 async function getInvoke() {
   if (invokeCache) {
@@ -9,10 +10,23 @@ async function getInvoke() {
 
   try {
     const tauriCore = await import('@tauri-apps/api/core')
-    invokeCache = tauriCore.invoke || null
 
-    if (!invokeCache) {
-      logger.error('Tauri invoke API is not available in imported module', tauriCore)
+    logger.info('Tauri core module imported', Object.keys(tauriCore))
+
+    if (tauriCore.invoke) {
+      invokeCache = tauriCore.invoke
+      isTauriEnvironment = true
+      logger.info('Tauri invoke API is available')
+    } else if ((tauriCore as any).default && (tauriCore as any).default.invoke) {
+      invokeCache = (tauriCore as any).default.invoke
+      isTauriEnvironment = true
+      logger.info('Tauri invoke API found in default export')
+    } else {
+      logger.error('Tauri invoke API not found', {
+        hasInvoke: !!tauriCore.invoke,
+        hasDefault: !!(tauriCore as any).default,
+        keys: Object.keys(tauriCore)
+      })
     }
 
     return invokeCache
@@ -46,6 +60,10 @@ export async function invokeWithErrorHandling<T>(
     )
     throw error
   }
+}
+
+export function isRunningInTauri(): boolean {
+  return isTauriEnvironment
 }
 
 export function handleAsyncError(
