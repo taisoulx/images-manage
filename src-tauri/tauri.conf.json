@@ -50,6 +50,9 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "dialog": {
+      "all": true
     }
   }
 }
