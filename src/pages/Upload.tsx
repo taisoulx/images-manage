@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { invokeWithErrorHandling } from '@/utils/errorHandler'
 
 interface FileData {
   name: string
@@ -8,7 +9,9 @@ interface FileData {
 
 export function Upload() {
   const [files, setFiles] = useState<FileData[]>([])
-  const [uploading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleSelectFiles = () => {
@@ -28,7 +31,51 @@ export function Upload() {
   }
 
   const handleUpload = async () => {
-    alert('上传功能需要数据库集成，目前为演示模式')
+    if (files.length === 0) {
+      setUploadStatus('请先选择要上传的图片')
+      setTimeout(() => setUploadStatus(''), 3000)
+      return
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadStatus('开始上传...')
+
+    try {
+      const total = files.length
+      let uploaded = 0
+      let successCount = 0
+      let failCount = 0
+
+      for (const file of files) {
+        try {
+          await invokeWithErrorHandling('upload_image', { path: file.path })
+          successCount++
+        } catch (error) {
+          console.error(`上传文件 ${file.name} 失败:`, error)
+          failCount++
+        }
+
+        uploaded++
+        const progress = (uploaded / total) * 100
+        setUploadProgress(progress)
+        setUploadStatus(`正在上传: ${uploaded}/${total} (成功: ${successCount}, 失败: ${failCount})`)
+      }
+
+      setUploadStatus(`上传完成! 成功: ${successCount}, 失败: ${failCount}`)
+      setTimeout(() => {
+        if (successCount > 0) {
+          setFiles([])
+          setUploadProgress(0)
+        }
+        setUploadStatus('')
+      }, 3000)
+    } catch (error) {
+      console.error('上传过程出错:', error)
+      setUploadStatus('上传失败，请重试')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -54,6 +101,8 @@ export function Upload() {
 
   const handleClearFiles = () => {
     setFiles([])
+    setUploadProgress(0)
+    setUploadStatus('')
   }
 
   return (
@@ -112,6 +161,30 @@ export function Upload() {
               </button>
             </div>
           </div>
+
+          {uploadStatus && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              uploadStatus.includes('失败') 
+                ? 'bg-destructive/10 text-destructive-foreground' 
+                : 'bg-muted text-foreground'
+            }`}>
+              {uploadStatus}
+            </div>
+          )}
+
+          {uploading && (
+            <div className="mb-4">
+              <div className="bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-primary h-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                上传进度: {uploadProgress.toFixed(1)}%
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {files.map((file, index) => (
