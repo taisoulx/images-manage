@@ -5,6 +5,7 @@ import { Gallery } from '@/pages/Gallery'
 import { Search } from '@/pages/Search'
 import { Upload } from '@/pages/Upload'
 import { Login } from '@/pages/Login'
+import { QrCode } from '@/pages/QrCode'
 
 const router = createBrowserRouter([
   {
@@ -26,6 +27,10 @@ const router = createBrowserRouter([
       {
         path: '/upload',
         element: <Upload />
+      },
+      {
+        path: '/qrcode',
+        element: <QrCode />
       },
       {
         path: '/login',

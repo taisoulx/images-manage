@@ -12,6 +12,7 @@ export function Layout() {
     { path: '/gallery', label: '图库' },
     { path: '/search', label: '搜索' },
     { path: '/upload', label: '上传' },
+    { path: '/qrcode', label: '二维码' },
     { path: '/login', label: '登录' },
   ]
 

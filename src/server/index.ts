@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
+import os from 'os'
 
 const fastify = Fastify({ logger: true })
 
@@ -21,6 +22,29 @@ fastify.get('/health', async () => {
 
 fastify.get('/api/health', async () => {
   return { status: 'ok', timestamp: Date.now() }
+})
+
+fastify.get('/api/network', async () => {
+  const interfaces = os.networkInterfaces()
+  let ipAddress = 'localhost'
+
+  for (const name in interfaces) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        ipAddress = iface.address
+        break
+      }
+    }
+  }
+
+  const port = 3000
+  const url = `http://${ipAddress}:${port}`
+
+  return {
+    ipAddress,
+    port,
+    url,
+  }
 })
 
 const start = async () => {
