@@ -6,6 +6,7 @@ import { Search } from '@/pages/Search'
 import { Upload } from '@/pages/Upload'
 import { Login } from '@/pages/Login'
 import { QrCode } from '@/pages/QrCode'
+import { Settings } from '@/pages/Settings'
 
 const router = createBrowserRouter([
   {
@@ -31,6 +32,10 @@ const router = createBrowserRouter([
       {
         path: '/qrcode',
         element: <QrCode />
+      },
+      {
+        path: '/settings',
+        element: <Settings />
       },
       {
         path: '/login',

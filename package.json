@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/postbuild.cjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:build": "tauri build && node scripts/copy-assets.cjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "type-check": "tsc --noEmit",
@@ -17,12 +17,14 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "server": "node src/server/index.ts"
+    "server": "tsx src/server/index.ts"
   },
   "dependencies": {
+    "@fastify/multipart": "^9.4.0",
     "@prisma/client": "^7.3.0",
     "@tauri-apps/api": "^2.9.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
+    "better-sqlite3": "^12.6.2",
     "fastify": "^5.7.2",
     "fastify-swagger": "^5.1.1",
     "qrcode.react": "^4.2.0",
@@ -39,6 +41,7 @@
     "@prisma/client": "^7.3.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tauri-apps/cli": "^2.0.4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.1.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",

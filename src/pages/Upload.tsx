@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { invokeWithErrorHandling } from '@/utils/errorHandler'
+import { open } from '@tauri-apps/plugin-dialog'
 
 interface FileData {
   name: string
@@ -12,22 +13,46 @@ export function Upload() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStatus, setUploadStatus] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [mounted, setMounted] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
-  const handleSelectFiles = () => {
-    fileInputRef.current?.click()
-  }
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || [])
+  const handleSelectFiles = async () => {
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [
+          {
+            name: '图片',
+            extensions: ['jpg', 'jpeg', 'png', 'webp']
+          }
+        ]
+      })
 
-    const fileObjects: FileData[] = selectedFiles.map(file => ({
-      name: file.name,
-      path: (file as any).path || file.name,
-      size: file.size
-    }))
+      if (selected) {
+        const paths = Array.isArray(selected) ? selected : [selected]
 
-    setFiles([...files, ...fileObjects])
+        const fileObjects: FileData[] = paths.map(path => {
+          const pathSegments = path.split(/[/\\]/)
+          const name = pathSegments[pathSegments.length - 1] || path
+
+          return {
+            name,
+            path,
+            size: 0
+          }
+        })
+
+        setFiles([...files, ...fileObjects])
+      }
+    } catch (error) {
+      console.error('选择文件失败:', error)
+      setUploadStatus('选择文件失败，请重试')
+      setTimeout(() => setUploadStatus(''), 3000)
+    }
   }
 
   const handleUpload = async () => {
@@ -80,19 +105,19 @@ export function Upload() {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
   }
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
-
-    const droppedFiles = Array.from(e.dataTransfer.files) as any[]
-    const fileObjects: FileData[] = droppedFiles.map(file => ({
-      name: file.name,
-      path: file.path || file.name,
-      size: file.size
-    }))
-
-    setFiles([...files, ...fileObjects])
+    setIsDragging(false)
+    setUploadStatus('请使用"选择文件"按钮来选择图片')
+    setTimeout(() => setUploadStatus(''), 3000)
   }
 
   const handleRemoveFile = (index: number) => {
@@ -107,107 +132,124 @@ export function Upload() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl sm:text-3xl font-bold">上传图片</h1>
-
-      <div
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={handleSelectFiles}
-        className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleFileInputChange}
-          className="hidden"
-        />
-        <p className="text-muted-foreground mb-4">
-          拖拽图片到此处或点击选择文件
-        </p>
-        <p className="text-sm text-muted-foreground">
+      {/* 标题 */}
+      <div className="animate-fade-in" style={{ animationDelay: '0ms', opacity: mounted ? 0 : 1 }}>
+        <h1 className="font-display text-3xl font-bold">上传图片</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           支持 JPG、PNG、WebP 格式
         </p>
       </div>
 
+      {/* 上传区域 */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleSelectFiles}
+        className={`
+          relative overflow-hidden rounded-xl border-2 border-dashed p-12 text-center cursor-pointer
+          transition-all duration-300 group animate-fade-in
+          ${isDragging ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50 hover:bg-accent/50'}
+        `}
+        style={{ animationDelay: '100ms', opacity: mounted ? 0 : 1 }}
+      >
+        {/* 背景装饰 */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gold/0 via-transparent to-gold/0 group-hover:from-gold/5 group-hover:to-gold/5 transition-all duration-500" />
+
+        <div className="relative z-10">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-card border border-border flex items-center justify-center group-hover:scale-110 group-hover:border-gold/50 transition-all duration-300">
+            <span className="text-4xl">↑</span>
+          </div>
+          <p className="text-lg font-medium mb-2 group-hover:text-gold transition-colors">
+            点击选择图片文件
+          </p>
+          <p className="text-sm text-muted-foreground">
+            支持批量上传
+          </p>
+        </div>
+      </div>
+
+      {/* 文件列表 */}
       {files.length > 0 && (
-        <div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+        <div className="space-y-4 animate-fade-in" style={{ animationDelay: '200ms', opacity: mounted ? 0 : 1 }}>
+          {/* 操作栏 */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-card border border-border">
             <div>
-              <h2 className="text-xl font-semibold">
-                已选择 {files.length} 张图片
+              <h2 className="font-semibold">
+                已选择 <span className="text-gold">{files.length}</span> 张图片
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 总大小: {(files.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
-            <div className="flex gap-2">
-              {files.length > 0 && (
-                <button
-                  onClick={handleClearFiles}
-                  disabled={uploading}
-                  className="px-3 py-1.5 bg-muted text-foreground rounded-md hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  清空
-                </button>
-              )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleClearFiles}
+                disabled={uploading}
+                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                清空
+              </button>
               <button
                 onClick={handleUpload}
                 disabled={uploading || files.length === 0}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-gradient-to-r from-gold to-gold-dark text-background font-semibold rounded-lg hover:shadow-lg hover:shadow-gold/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
               >
                 {uploading ? '上传中...' : '开始上传'}
               </button>
             </div>
           </div>
 
+          {/* 状态消息 */}
           {uploadStatus && (
-            <div className={`mb-4 p-3 rounded-lg ${
-              uploadStatus.includes('失败') 
-                ? 'bg-destructive/10 text-destructive-foreground' 
-                : 'bg-muted text-foreground'
+            <div className={`p-4 rounded-lg animate-fade-in ${
+              uploadStatus.includes('失败')
+                ? 'bg-destructive/10 text-destructive border border-destructive/20'
+                : uploadStatus.includes('完成')
+                ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                : 'bg-muted'
             }`}>
               {uploadStatus}
             </div>
           )}
 
+          {/* 进度条 */}
           {uploading && (
-            <div className="mb-4">
-              <div className="bg-muted rounded-full h-2 overflow-hidden">
+            <div className="p-4 rounded-lg bg-card border border-border animate-fade-in">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-muted-foreground">上传进度</span>
+                <span className="text-sm font-medium text-gold">{uploadProgress.toFixed(1)}%</span>
+              </div>
+              <div className="h-2 bg-surface rounded-full overflow-hidden">
                 <div
-                  className="bg-primary h-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-gold to-gold-dark transition-all duration-300 ease-out"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                上传进度: {uploadProgress.toFixed(1)}%
-              </p>
             </div>
           )}
 
+          {/* 文件列表 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {files.map((file, index) => (
               <div
                 key={index}
-                className="flex items-start space-x-3 p-3 border border-border rounded-lg bg-card hover:border-primary transition-colors"
+                className="group relative flex items-start gap-3 p-4 rounded-lg bg-card border border-border hover:border-gold/50 transition-all duration-300 animate-scale-in"
+                style={{ animationDelay: `${index * 50}ms`, opacity: mounted ? 0 : 1 }}
               >
-                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 rounded-lg bg-surface flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                   📷
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
                     {file.path}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {(file.size / 1024).toFixed(2)} KB
                   </p>
                 </div>
                 <button
                   onClick={() => handleRemoveFile(index)}
                   disabled={uploading}
-                  className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  className="p-2 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed transition-all opacity-0 group-hover:opacity-100"
                   title="移除"
                 >
                   ✕

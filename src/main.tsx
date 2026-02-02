@@ -1,16 +1,15 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { AppRouter } from './components/Router'
+import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { logger } from './utils/logger'
 import './styles/globals.css'
 
-logger.info('Application starting')
+console.log('[main] Application starting')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <AppRouter />
+      <App />
     </ErrorBoundary>
   </React.StrictMode>,
 )
