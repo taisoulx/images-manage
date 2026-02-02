@@ -430,31 +430,70 @@ fn get_local_ip() -> String {
 fn get_all_local_ips() -> Vec<String> {
     let mut addresses = Vec::new();
 
-    // 简化版本：返回常见的本地IP地址
-    // 实际应用中可以使用更复杂的网络接口查询
-
-    // 在 Unix 系统上可以通过系统调用获取网络接口
-    #[cfg(unix)]
+    // 在 macOS 上使用 ifconfig
+    #[cfg(target_os = "macos")]
     {
         use std::process::Command;
 
-        if let Ok(output) = Command::new("hostname")
-            .arg("-I")
+        if let Ok(output) = Command::new("ifconfig")
+            .args(["-a"])
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut current_interface = String::new();
+
             for line in stdout.lines() {
-                let ip = line.trim();
-                if !ip.is_empty() && !ip.starts_with("hostname:") {
-                    addresses.push(ip.to_string());
+                // 检测网络接口名称
+                if line.contains(": flags=") && !line.contains("LOOPBACK") {
+                    if let Some(if_name) = line.split(':').next() {
+                        current_interface = if_name.trim().to_string();
+                    }
+                }
+
+                // 检测 inet 地址（IPv4）
+                if line.trim().starts_with("inet ") && current_interface != "lo0" {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        let ip = parts[1];
+                        if ip != "127.0.0.1" {
+                            addresses.push(ip.to_string());
+                        }
+                    }
                 }
             }
         }
     }
 
-    // 添加 localhost
-    addresses.push("127.0.0.1".to_string());
-    addresses.push("localhost".to_string());
+    // 在 Linux 上使用 ip 命令
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+
+        if let Ok(output) = Command::new("ip")
+            .args(["-4", "addr", "show"])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.trim().starts_with("inet ") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        let ip_with_cidr = parts[1];
+                        if let Some(ip) = ip_with_cidr.split('/').next() {
+                            if ip != "127.0.0.1" {
+                                addresses.push(ip.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 添加 localhost 作为备用
+    if addresses.is_empty() {
+        addresses.push("127.0.0.1".to_string());
+    }
 
     addresses
 }
