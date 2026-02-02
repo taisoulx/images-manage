@@ -22,6 +22,10 @@ export function MobileGallery() {
   const [editingDescription, setEditingDescription] = useState(false)
   const [newDescription, setNewDescription] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
+  const [editingFilename, setEditingFilename] = useState(false)
+  const [newFilename, setNewFilename] = useState('')
+  const [filenameError, setFilenameError] = useState('')
+  const [savingFilename, setSavingFilename] = useState(false)
 
   useEffect(() => {
     loadImages()
@@ -103,6 +107,52 @@ export function MobileGallery() {
       alert('保存失败，请重试')
     } finally {
       setSavingDescription(false)
+    }
+  }
+
+  // 新增：保存文件名
+  const handleSaveFilename = async () => {
+    if (!selectedImage) return
+
+    if (!newFilename.trim()) {
+      setFilenameError('文件名不能为空')
+      return
+    }
+
+    setSavingFilename(true)
+    setFilenameError('')
+    try {
+      const response = await fetch(`${serverUrl}/api/images/${selectedImage.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: newFilename }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || '保存失败')
+      }
+
+      const result = await response.json()
+      const oldExtension = selectedImage.filename.substring(selectedImage.filename.lastIndexOf('.'))
+      const newFilenameWithExt = newFilename.trim() + oldExtension
+
+      setImages(prev =>
+        prev.map(img =>
+          img.id === selectedImage.id
+            ? { ...img, filename: result.filename || newFilenameWithExt }
+            : img
+        )
+      )
+      setSelectedImage({ ...selectedImage, filename: result.filename || newFilenameWithExt })
+      setEditingFilename(false)
+
+      // 显示成功提示
+      alert('文件名已保存')
+    } catch (error: any) {
+      setFilenameError(error.message || '保存失败，请重试')
+    } finally {
+      setSavingFilename(false)
     }
   }
 
@@ -242,13 +292,79 @@ export function MobileGallery() {
             {/* 底部信息 */}
             <div className="flex-shrink-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
               <div className="space-y-3">
+                {/* 文件名 - 可编辑 */}
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">{selectedImage.filename}</h3>
+                  {editingFilename ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newFilename}
+                          onChange={(e) => {
+                            setNewFilename(e.target.value)
+                            setFilenameError('')
+                          }}
+                          placeholder="输入文件名"
+                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-gold"
+                          disabled={savingFilename}
+                        />
+                        <span className="px-3 py-2 bg-white/10 text-white/60 rounded-xl text-sm flex items-center">
+                          {selectedImage.filename.substring(selectedImage.filename.lastIndexOf('.'))}
+                        </span>
+                      </div>
+                      {filenameError && (
+                        <p className="text-red-400 text-xs">{filenameError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveFilename}
+                          disabled={savingFilename}
+                          className="flex-1 px-4 py-2 bg-gold text-background rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {savingFilename ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                              保存中...
+                            </>
+                          ) : (
+                            '保存'
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingFilename(false)
+                            setFilenameError('')
+                          }}
+                          disabled={savingFilename}
+                          className="flex-1 px-4 py-2 bg-white/10 text-white rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => {
+                        setEditingFilename(true)
+                        setNewFilename(selectedImage.filename.substring(0, selectedImage.filename.lastIndexOf('.')))
+                        setFilenameError('')
+                      }}
+                      className="p-3 bg-white/5 rounded-xl cursor-pointer"
+                    >
+                      <p className="text-sm text-white">{selectedImage.filename}</p>
+                      <p className="text-xs text-white/40">点击编辑文件名</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 文件信息 */}
+                <div>
                   <p className="text-xs text-white/60">
                     {formatFileSize(selectedImage.size)} · {formatDate(selectedImage.created_at)}
                   </p>
                 </div>
 
+                {/* 描述 - 可编辑 */}
                 {editingDescription ? (
                   <div className="space-y-2">
                     <textarea
