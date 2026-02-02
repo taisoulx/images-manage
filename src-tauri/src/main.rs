@@ -29,11 +29,23 @@ fn main() {
             commands::get_image_by_id,
             commands::delete_image,
             commands::start_server,
+            commands::stop_server,
+            commands::get_server_status,
         ])
         .setup(|app| {
             #[cfg(desktop)]
             {
-                let _window = app.get_webview_window("main").unwrap();
+                let window = app.get_webview_window("main").unwrap();
+
+                // 监听窗口关闭事件，自动停止服务器
+                let _app_handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { .. } = event {
+                        println!("应用即将关闭，正在停止 API 服务器...");
+                        // 同步停止服务器
+                        let _ = commands::stop_server();
+                    }
+                });
             }
 
             // 初始化数据库

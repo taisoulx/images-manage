@@ -6,8 +6,12 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use std::io::Read;
+use std::sync::Mutex;
 use tauri::command;
 use hex;
+
+// 全局服务器进程管理
+static SERVER_PROCESS: Mutex<Option<std::process::Child>> = Mutex::new(None);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemInfo {
@@ -484,22 +488,149 @@ pub fn delete_image(id: i32) -> Result<(), String> {
 pub fn start_server() -> Result<String, String> {
     use std::process::Command;
 
+    // 检查服务器是否已经在运行
+    let mut process = SERVER_PROCESS.lock().unwrap();
+    if process.is_some() {
+        return Ok("服务器已在运行中".to_string());
+    }
+
+    // 检查端口 3000 是否被占用
+    let port_check = Command::new("lsof")
+        .args(["-ti:3000"])
+        .output();
+
+    if port_check.is_ok() && !port_check.unwrap().stdout.is_empty() {
+        return Ok("端口 3000 已被占用，请先关闭其他占用该端口的程序".to_string());
+    }
+
     // 在后台启动服务器
     #[cfg(target_os = "windows")]
     {
-        Command::new("cmd")
+        let child = Command::new("cmd")
             .args(["/c", "start /B npm run server"])
             .spawn()
             .map_err(|e| format!("启动服务器失败: {}", e))?;
-        Ok("服务器启动中...".to_string())
+        *process = Some(child);
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("npm")
+        let child = Command::new("npm")
             .args(["run", "server"])
             .spawn()
             .map_err(|e| format!("启动服务器失败: {}", e))?;
-        Ok("服务器启动中...".to_string())
+        *process = Some(child);
     }
+
+    Ok("服务器启动成功".to_string())
+}
+
+/// 停止 API 服务器
+#[command]
+pub fn stop_server() -> Result<String, String> {
+    use std::process::Command;
+
+    let mut process = SERVER_PROCESS.lock().unwrap();
+
+    if let Some(mut child) = process.take() {
+        // 尝试优雅终止进程
+        let _ = child.kill();
+
+        // 等待进程结束（最多等待 2 秒）
+        let _ = child.try_wait();
+
+        // 清理端口 3000 上的所有进程（确保清理干净）
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = Command::new("lsof")
+                .args(["-ti:3000"])
+                .output()
+                .map(|output| {
+                    if !output.stdout.is_empty() {
+                        let pids = String::from_utf8_lossy(&output.stdout);
+                        for pid in pids.lines() {
+                            let _ = Command::new("kill")
+                                .args(["-9", pid.trim()])
+                                .spawn();
+                        }
+                    }
+                });
+        }
+
+        Ok("服务器已停止".to_string())
+    } else {
+        // 没有保存的进程，尝试清理端口
+        #[cfg(not(target_os = "windows"))]
+        {
+            let output = Command::new("lsof")
+                .args(["-ti:3000"])
+                .output();
+
+            if output.is_ok() {
+                let stdout = output.unwrap().stdout;
+                if !stdout.is_empty() {
+                    let pids = String::from_utf8_lossy(&stdout);
+                    for pid in pids.lines() {
+                        Command::new("kill")
+                            .args(["-9", pid.trim()])
+                            .spawn()
+                            .ok();
+                    }
+                    return Ok("服务器已停止（清理了占用端口的进程）".to_string());
+                }
+            }
+        }
+
+        Ok("服务器未在运行".to_string())
+    }
+}
+
+/// 获取服务器状态
+#[command]
+pub fn get_server_status() -> Result<bool, String> {
+    use std::process::Command;
+
+    let process = SERVER_PROCESS.lock().unwrap();
+
+    // 检查保存的进程是否存在
+    if let Some(child) = process.as_ref() {
+        // 获取进程ID
+        let pid = child.id();
+
+        // 在 Unix 系统上，我们可以通过发送信号 0 来检查进程是否存在
+        #[cfg(unix)]
+        {
+            let result = Command::new("kill")
+                .args(["-0", &pid.to_string()])
+                .output();
+            if result.is_ok() {
+                return Ok(true);
+            } else {
+                // 进程已结束，清理
+                drop(process);
+                let _ = SERVER_PROCESS.lock().unwrap().take();
+                return Ok(false);
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            // Windows 或其他系统，假设进程还在运行
+            return Ok(true);
+        }
+    }
+
+    // 检查端口 3000 是否被占用
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = Command::new("lsof")
+            .args(["-ti:3000"])
+            .output();
+
+        if output.is_ok() && !output.unwrap().stdout.is_empty() {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ImageViewer } from '@/components/mobile/ImageViewer'
+import { ImageViewer } from '../components/mobile/ImageViewer'
 
 interface Image {
   id: number

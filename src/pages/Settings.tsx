@@ -54,9 +54,58 @@ export function Settings() {
   const [message, setMessage] = useState('')
   const [configFilePath, setConfigFilePath] = useState('')
 
+  // 服务器管理状态
+  const [serverRunning, setServerRunning] = useState(false)
+  const [serverLoading, setServerLoading] = useState(false)
+  const [serverMessage, setServerMessage] = useState('')
+
   useEffect(() => {
     loadConfig()
+    checkServerStatus()
   }, [])
+
+  const checkServerStatus = async () => {
+    try {
+      const running = await invoke<boolean>('get_server_status')
+      setServerRunning(running)
+    } catch (error) {
+      console.error('检查服务器状态失败:', error)
+    }
+  }
+
+  const handleStartServer = async () => {
+    try {
+      setServerLoading(true)
+      setServerMessage('')
+      const result = await invoke<string>('start_server')
+      setServerMessage(result)
+      await checkServerStatus()
+      setTimeout(() => setServerMessage(''), 3000)
+    } catch (error) {
+      console.error('启动服务器失败:', error)
+      setServerMessage('启动服务器失败')
+      setTimeout(() => setServerMessage(''), 3000)
+    } finally {
+      setServerLoading(false)
+    }
+  }
+
+  const handleStopServer = async () => {
+    try {
+      setServerLoading(true)
+      setServerMessage('')
+      const result = await invoke<string>('stop_server')
+      setServerMessage(result)
+      await checkServerStatus()
+      setTimeout(() => setServerMessage(''), 3000)
+    } catch (error) {
+      console.error('停止服务器失败:', error)
+      setServerMessage('停止服务器失败')
+      setTimeout(() => setServerMessage(''), 3000)
+    } finally {
+      setServerLoading(false)
+    }
+  }
 
   const loadConfig = async () => {
     try {
@@ -177,6 +226,64 @@ export function Settings() {
           onChange={(value) => setConfig({ ...config, thumbnails_dir: value || null })}
           onBrowse={() => handleBrowseDirectory('thumbnails')}
         />
+      </div>
+
+      {/* API 服务器管理 */}
+      <div className="space-y-4 p-4 border border-border rounded-lg bg-card">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">API 服务器</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              管理移动端 H5 访问的 API 服务器
+            </p>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            serverRunning
+              ? 'bg-green-500/10 text-green-500'
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            {serverRunning ? '运行中' : '已停止'}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleStartServer}
+            disabled={serverLoading || serverRunning}
+            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {serverLoading ? '处理中...' : '启动服务器'}
+          </button>
+          <button
+            onClick={handleStopServer}
+            disabled={serverLoading || !serverRunning}
+            className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {serverLoading ? '处理中...' : '停止服务器'}
+          </button>
+        </div>
+
+        {serverMessage && (
+          <div className={`p-3 rounded-lg text-sm ${
+            serverMessage.includes('成功') || serverMessage.includes('已停止')
+              ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+              : serverMessage.includes('失败') || serverMessage.includes('占用')
+              ? 'bg-destructive/10 text-destructive border border-destructive/20'
+              : 'bg-muted/50 text-muted-foreground'
+          }`}>
+            {serverMessage}
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground space-y-1 p-3 bg-muted/30 rounded-lg">
+          <p>💡 <strong>服务器说明:</strong></p>
+          <ul className="list-disc list-inside space-y-1 mt-2">
+            <li>服务器启动后，移动设备可通过局域网访问应用</li>
+            <li>服务器默认运行在 <code>http://0.0.0.0:3000</code></li>
+            <li>关闭应用时会自动停止服务器</li>
+            <li>如果端口被占用，请先停止其他占用该端口的程序</li>
+          </ul>
+        </div>
       </div>
 
       {/* 缩略图设置 */}
