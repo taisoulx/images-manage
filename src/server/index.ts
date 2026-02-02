@@ -169,11 +169,53 @@ fastify.get('/api/images/:id/file', async (request: any, reply: any) => {
 fastify.put('/api/images/:id', async (request: any, _reply: any) => {
   const database = getDb()
   const { id } = request.params
-  const { description } = request.body
+  const { description, filename } = request.body
 
-  database.prepare('UPDATE images SET description = ?, updated_at = datetime(\'now\') WHERE id = ?').run(description || null, id)
+  // 获取当前图片信息
+  const currentImage = database.prepare('SELECT id, filename, path FROM images WHERE id = ?').get(id) as any
 
-  return { success: true }
+  if (!currentImage) {
+    return { success: false, error: 'Image not found' }
+  }
+
+  let finalFilename = currentImage.filename
+  let finalPath = currentImage.path
+
+  // 处理文件名更新
+  if (filename && filename.trim()) {
+    const { renameSync } = await import('fs')
+    const { dirname, extname } = await import('path')
+
+    const oldPath = currentImage.path
+    const oldExtension = extname(oldPath)
+    const newFilename = filename.trim() + oldExtension
+    const newPath = join(dirname(oldPath), newFilename)
+
+    // 检查文件名是否已存在
+    const existing = database.prepare(
+      'SELECT id FROM images WHERE filename = ?1 AND id != ?2'
+    ).get(newFilename, id) as any
+
+    if (existing) {
+      return { success: false, error: `文件名 '${newFilename}' 已存在` }
+    }
+
+    // 重命名文件
+    try {
+      renameSync(oldPath, newPath)
+      finalFilename = newFilename
+      finalPath = newPath
+    } catch (e: any) {
+      return { success: false, error: `重命名文件失败: ${e.message}` }
+    }
+  }
+
+  // 更新数据库
+  database.prepare(
+    'UPDATE images SET filename = ?, path = ?, description = ?, updated_at = datetime(\'now\') WHERE id = ?'
+  ).run(finalFilename, finalPath, description || null, id)
+
+  return { success: true, filename: finalFilename }
 })
 
 // API 端点：删除图片
