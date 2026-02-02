@@ -166,7 +166,7 @@ fastify.get('/api/images/:id/file', async (request: any, reply: any) => {
 })
 
 // API 端点：更新图片信息
-fastify.put('/api/images/:id', async (request: any, _reply: any) => {
+fastify.put('/api/images/:id', async (request: any, reply: any) => {
   const database = getDb()
   const { id } = request.params
   const { description, filename } = request.body
@@ -175,7 +175,7 @@ fastify.put('/api/images/:id', async (request: any, _reply: any) => {
   const currentImage = database.prepare('SELECT id, filename, path FROM images WHERE id = ?').get(id) as any
 
   if (!currentImage) {
-    return { success: false, error: 'Image not found' }
+    return reply.code(404).send({ success: false, error: 'Image not found' })
   }
 
   let finalFilename = currentImage.filename
@@ -183,12 +183,19 @@ fastify.put('/api/images/:id', async (request: any, _reply: any) => {
 
   // 处理文件名更新
   if (filename && filename.trim()) {
+    const trimmedFilename = filename.trim()
+
+    // 检查 trim 后是否为空字符串
+    if (!trimmedFilename) {
+      return reply.code(400).send({ success: false, error: '文件名不能为空' })
+    }
+
     const { renameSync } = await import('fs')
     const { dirname, extname } = await import('path')
 
     const oldPath = currentImage.path
     const oldExtension = extname(oldPath)
-    const newFilename = filename.trim() + oldExtension
+    const newFilename = trimmedFilename + oldExtension
     const newPath = join(dirname(oldPath), newFilename)
 
     // 检查文件名是否已存在
@@ -197,7 +204,7 @@ fastify.put('/api/images/:id', async (request: any, _reply: any) => {
     ).get(newFilename, id) as any
 
     if (existing) {
-      return { success: false, error: `文件名 '${newFilename}' 已存在` }
+      return reply.code(409).send({ success: false, error: `文件名 '${newFilename}' 已存在` })
     }
 
     // 重命名文件
@@ -206,7 +213,7 @@ fastify.put('/api/images/:id', async (request: any, _reply: any) => {
       finalFilename = newFilename
       finalPath = newPath
     } catch (e: any) {
-      return { success: false, error: `重命名文件失败: ${e.message}` }
+      return reply.code(500).send({ success: false, error: `重命名文件失败: ${e.message}` })
     }
   }
 
