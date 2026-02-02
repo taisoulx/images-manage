@@ -62,6 +62,8 @@ export function Settings() {
   useEffect(() => {
     loadConfig()
     checkServerStatus()
+    const interval = setInterval(checkServerStatus, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   const checkServerStatus = async () => {
@@ -74,34 +76,28 @@ export function Settings() {
   }
 
   const handleStartServer = async () => {
+    setServerLoading(true)
+    setServerMessage('')
     try {
-      setServerLoading(true)
-      setServerMessage('')
       const result = await invoke<string>('start_server')
       setServerMessage(result)
-      await checkServerStatus()
-      setTimeout(() => setServerMessage(''), 3000)
-    } catch (error) {
-      console.error('启动服务器失败:', error)
-      setServerMessage('启动服务器失败')
-      setTimeout(() => setServerMessage(''), 3000)
+      setServerRunning(true)
+    } catch (error: any) {
+      setServerMessage(error.toString())
     } finally {
       setServerLoading(false)
     }
   }
 
   const handleStopServer = async () => {
+    setServerLoading(true)
+    setServerMessage('')
     try {
-      setServerLoading(true)
-      setServerMessage('')
       const result = await invoke<string>('stop_server')
       setServerMessage(result)
-      await checkServerStatus()
-      setTimeout(() => setServerMessage(''), 3000)
-    } catch (error) {
-      console.error('停止服务器失败:', error)
-      setServerMessage('停止服务器失败')
-      setTimeout(() => setServerMessage(''), 3000)
+      setServerRunning(false)
+    } catch (error: any) {
+      setServerMessage(error.toString())
     } finally {
       setServerLoading(false)
     }
@@ -228,64 +224,6 @@ export function Settings() {
         />
       </div>
 
-      {/* API 服务器管理 */}
-      <div className="space-y-4 p-4 border border-border rounded-lg bg-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">API 服务器</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              管理移动端 H5 访问的 API 服务器
-            </p>
-          </div>
-          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-            serverRunning
-              ? 'bg-green-500/10 text-green-500'
-              : 'bg-muted text-muted-foreground'
-          }`}>
-            {serverRunning ? '运行中' : '已停止'}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={handleStartServer}
-            disabled={serverLoading || serverRunning}
-            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {serverLoading ? '处理中...' : '启动服务器'}
-          </button>
-          <button
-            onClick={handleStopServer}
-            disabled={serverLoading || !serverRunning}
-            className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {serverLoading ? '处理中...' : '停止服务器'}
-          </button>
-        </div>
-
-        {serverMessage && (
-          <div className={`p-3 rounded-lg text-sm ${
-            serverMessage.includes('成功') || serverMessage.includes('已停止')
-              ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-              : serverMessage.includes('失败') || serverMessage.includes('占用')
-              ? 'bg-destructive/10 text-destructive border border-destructive/20'
-              : 'bg-muted/50 text-muted-foreground'
-          }`}>
-            {serverMessage}
-          </div>
-        )}
-
-        <div className="text-xs text-muted-foreground space-y-1 p-3 bg-muted/30 rounded-lg">
-          <p>💡 <strong>服务器说明:</strong></p>
-          <ul className="list-disc list-inside space-y-1 mt-2">
-            <li>服务器启动后，移动设备可通过局域网访问应用</li>
-            <li>服务器默认运行在 <code>http://0.0.0.0:3000</code></li>
-            <li>关闭应用时会自动停止服务器</li>
-            <li>如果端口被占用，请先停止其他占用该端口的程序</li>
-          </ul>
-        </div>
-      </div>
-
       {/* 缩略图设置 */}
       <div className="space-y-4 p-4 border border-border rounded-lg bg-card">
         <h2 className="text-lg font-semibold">缩略图设置</h2>
@@ -336,6 +274,102 @@ export function Settings() {
               className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+        </div>
+      </div>
+
+      {/* API 服务器管理 */}
+      <div className="space-y-4 p-4 border border-border rounded-lg bg-card">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">API 服务器</h2>
+          {/* 状态徽章 */}
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+            serverRunning
+              ? 'bg-green-500/20 text-green-500'
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              serverRunning ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground'
+            }`} />
+            {serverRunning ? '运行中' : '已停止'}
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          启动后可通过局域网访问应用，支持手机 H5 界面。
+        </p>
+
+        {/* 服务器状态卡片 */}
+        <div className={`p-4 rounded-lg border-2 ${
+          serverRunning
+            ? 'border-green-500/30 bg-green-500/5'
+            : 'border-border bg-muted/30'
+        }`}>
+          {serverRunning ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-green-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-medium">服务器正在运行</span>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                端口: <code className="px-1.5 py-0.5 bg-background rounded">3000</code>
+              </div>
+              <button
+                onClick={handleStopServer}
+                disabled={serverLoading}
+                className="w-full px-4 py-2.5 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+                {serverLoading ? '停止中...' : '停止服务器'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <span className="font-medium">服务器未运行</span>
+              </div>
+              <button
+                onClick={handleStartServer}
+                disabled={serverLoading}
+                className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {serverLoading ? '启动中...' : '启动服务器'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 消息提示 */}
+        {serverMessage && (
+          <div className={`p-3 rounded-lg text-sm ${
+            serverMessage.includes('成功') || serverMessage.includes('运行')
+              ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+              : 'bg-destructive/10 text-destructive-foreground border border-destructive/20'
+          }`}>
+            {serverMessage}
+          </div>
+        )}
+
+        {/* 服务器说明 */}
+        <div className="text-xs text-muted-foreground space-y-1 p-3 bg-muted/30 rounded-lg">
+          <p className="font-medium">💡 提示：</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>启动后可在局域网内通过手机访问</li>
+            <li>关闭应用时会自动停止服务器</li>
+            <li>确保端口 3000 未被其他程序占用</li>
+            <li>在首页点击"局域网访问"可查看二维码</li>
+          </ul>
         </div>
       </div>
 
