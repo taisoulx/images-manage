@@ -311,6 +311,24 @@ export function MobileGallery() {
 
             {/* 图片查看器（支持手势缩放和滑动） */}
             <div className="flex-1">
+              {/* 预加载相邻图片 */}
+              {currentIndex > 0 && (
+                <img
+                  src={`${serverUrl}/api/images/${images[currentIndex - 1].id}/file`}
+                  alt=""
+                  className="hidden"
+                  loading="eager"
+                />
+              )}
+              {currentIndex < images.length - 1 && (
+                <img
+                  src={`${serverUrl}/api/images/${images[currentIndex + 1].id}/file`}
+                  alt=""
+                  className="hidden"
+                  loading="eager"
+                />
+              )}
+
               <ImageViewer
                 src={`${serverUrl}/api/images/${selectedImage.id}/file`}
                 alt={selectedImage.filename}
