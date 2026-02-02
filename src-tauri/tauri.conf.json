@@ -55,7 +55,14 @@
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
-      "wix": null
+      "wix": null,
+      "nsis": {
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": {
+        "type": "embed",
+        "autoupdate": true
+      }
     }
   }
 }

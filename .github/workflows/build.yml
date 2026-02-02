@@ -100,6 +100,42 @@ jobs:
           TAURI_PRIVATE_KEY: ""
           TAURI_KEY_PASSWORD: ""
 
+      - name: Copy frontend assets for Windows (workaround for resource embedding)
+        run: |
+          Write-Host "=== Copying frontend assets for Windows build ==="
+
+          # 复制到 release 目录（用于直接运行 exe）
+          $releaseDir = "src-tauri\target\release"
+          if (Test-Path "$releaseDir\图片管理软件.exe") {
+            New-Item -ItemType Directory -Force -Path "$releaseDir\dist" | Out-Null
+            Copy-Item -Path "dist\*" -Destination "$releaseDir\dist\" -Recurse -Force
+            Write-Host "✓ Copied frontend assets to $releaseDir\dist"
+          }
+
+          # 检查 NSIS bundle 目录
+          $nsisDir = "src-tauri\target\release\bundle\nsis"
+          if (Test-Path "$nsisDir") {
+            Write-Host "=== NSIS bundle directory found ==="
+            Get-ChildItem -Path "$nsisDir" -Filter "*.exe" | ForEach-Object {
+              Write-Host "NSIS installer: $($_.FullName)"
+            }
+
+            # 尝试复制资源到 NSIS 构建目录
+            $nsisResourceDir = "$nsisDir\resources"
+            if (Test-Path $nsisResourceDir) {
+              New-Item -ItemType Directory -Force -Path "$nsisResourceDir\dist" | Out-Null
+              Copy-Item -Path "dist\*" -Destination "$nsisResourceDir\dist\" -Recurse -Force
+              Write-Host "✓ Copied frontend assets to NSIS resources"
+            }
+          }
+
+          Write-Host "=== Verifying frontend build ==="
+          if (Test-Path "dist\index.html") {
+            Write-Host "✓ dist/index.html exists"
+          } else {
+            Write-Host "✗ dist/index.html NOT found!"
+          }
+
       - name: List bundle contents (debug)
         run: |
           echo "=== Bundle directory structure ==="
@@ -107,6 +143,14 @@ jobs:
           echo ""
           echo "=== Contents of src-tauri\target\release\bundle\ ==="
           Get-ChildItem -Path src-tauri\target\release\bundle\ -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+          echo ""
+          echo "=== Check if dist folder exists in release ==="
+          if (Test-Path "src-tauri\target\release\dist") {
+            Write-Host "✓ dist folder exists"
+            Get-ChildItem -Path "src-tauri\target\release\dist" | Select-Object Name
+          } else {
+            Write-Host "✗ dist folder NOT found"
+          }
 
       - name: Upload Windows app
         uses: actions/upload-artifact@v4
