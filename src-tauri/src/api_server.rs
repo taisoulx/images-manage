@@ -61,8 +61,6 @@ struct ServerHandle {
 
 /// 启动 API 服务器
 pub fn start_server() -> Result<String, String> {
-    use crate::config;
-
     // 检查是否已经有服务器在运行
     let mut handle = SERVER_HANDLE.lock().unwrap();
     if handle.is_some() {

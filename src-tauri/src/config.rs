@@ -159,35 +159,3 @@ pub fn get_thumbnails_dir() -> PathBuf {
     path.push("thumbnails");
     path
 }
-
-/// 获取项目根目录
-pub fn get_project_dir() -> PathBuf {
-    if cfg!(debug_assertions) {
-        // 开发模式：从当前可执行文件向上查找项目根目录
-        let exe_path = std::env::current_exe().unwrap();
-        let mut path = exe_path.clone();
-
-        // 向上查找，直到找到包含 package.json 或 src-tauri 目录
-        for _ in 0..10 {
-            if path.join("package.json").exists() || path.join("src-tauri").exists() {
-                return path;
-            }
-            path.pop();
-        }
-
-        // 如果找不到，返回当前目录
-        std::env::current_dir().unwrap()
-    } else {
-        // 生产模式：使用应用数据目录
-        let data_dir = dirs::data_dir()
-            .unwrap_or_else(|| {
-                let mut path = std::env::current_exe().unwrap();
-                path.pop();
-                path
-            });
-
-        let project_dir = data_dir.join("images-manage");
-        std::fs::create_dir_all(&project_dir).ok();
-        project_dir
-    }
-}
