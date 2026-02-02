@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { ImageViewer } from '@/components/mobile/ImageViewer'
 
 interface Image {
   id: number
@@ -26,6 +27,34 @@ export function MobileGallery() {
   const [newFilename, setNewFilename] = useState('')
   const [filenameError, setFilenameError] = useState('')
   const [savingFilename, setSavingFilename] = useState(false)
+
+  // 计算当前图片索引
+  const currentIndex = useMemo(() => {
+    if (!selectedImage) return -1
+    return images.findIndex(img => img.id === selectedImage.id)
+  }, [selectedImage, images])
+
+  // 上一张
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      const prevImage = images[currentIndex - 1]
+      setSelectedImage(prevImage)
+      // 重置编辑状态
+      setEditingFilename(false)
+      setEditingDescription(false)
+    }
+  }
+
+  // 下一张
+  const handleNext = () => {
+    if (currentIndex < images.length - 1) {
+      const nextImage = images[currentIndex + 1]
+      setSelectedImage(nextImage)
+      // 重置编辑状态
+      setEditingFilename(false)
+      setEditingDescription(false)
+    }
+  }
 
   useEffect(() => {
     loadImages()
@@ -258,10 +287,10 @@ export function MobileGallery() {
 
       {/* 图片详情弹窗 */}
       {selectedImage && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
+        <div className="fixed inset-0 z-50 bg-black/95" onClick={() => setSelectedImage(null)}>
           <div className="h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* 顶部工具栏 */}
-            <div className="flex items-center justify-between p-4">
+            <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
               <button
                 onClick={() => setSelectedImage(null)}
                 className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
@@ -280,145 +309,160 @@ export function MobileGallery() {
               </button>
             </div>
 
-            {/* 图片 */}
-            <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-              <img
+            {/* 图片查看器（支持手势缩放和滑动） */}
+            <div className="flex-1">
+              <ImageViewer
                 src={`${serverUrl}/api/images/${selectedImage.id}/file`}
                 alt={selectedImage.filename}
-                className="max-w-full max-h-[60vh] object-contain rounded-lg"
+                currentIndex={currentIndex}
+                totalImages={images.length}
+                onNext={handleNext}
+                onPrevious={handlePrevious}
+                onClose={() => setSelectedImage(null)}
               />
             </div>
 
-            {/* 底部信息 */}
-            <div className="flex-shrink-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-              <div className="space-y-3">
-                {/* 文件名 - 可编辑 */}
-                <div>
-                  {editingFilename ? (
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newFilename}
-                          onChange={(e) => {
-                            setNewFilename(e.target.value)
-                            setFilenameError('')
-                          }}
-                          placeholder="输入文件名"
-                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-gold"
-                          disabled={savingFilename}
-                        />
-                        <span className="px-3 py-2 bg-white/10 text-white/60 rounded-xl text-sm flex items-center">
-                          {selectedImage.filename.substring(selectedImage.filename.lastIndexOf('.'))}
-                        </span>
-                      </div>
-                      {filenameError && (
-                        <p className="text-red-400 text-xs">{filenameError}</p>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSaveFilename}
-                          disabled={savingFilename}
-                          className="flex-1 px-4 py-2 bg-gold text-background rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {savingFilename ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                              保存中...
-                            </>
-                          ) : (
-                            '保存'
-                          )}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingFilename(false)
-                            setFilenameError('')
-                          }}
-                          disabled={savingFilename}
-                          className="flex-1 px-4 py-2 bg-white/10 text-white rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          取消
-                        </button>
+            {/* 底部信息面板 - 点击编辑时显示 */}
+            {(editingFilename || editingDescription) && (
+              <div className="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black via-black/90 to-transparent" onClick={(e) => e.stopPropagation()}>
+                <div className="space-y-3 max-h-[40vh] overflow-y-auto">
+                  {/* 文件名 - 可编辑 */}
+                  {editingFilename && (
+                    <div>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newFilename}
+                            onChange={(e) => {
+                              setNewFilename(e.target.value)
+                              setFilenameError('')
+                            }}
+                            placeholder="输入文件名"
+                            className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-gold"
+                            disabled={savingFilename}
+                            autoFocus
+                          />
+                          <span className="px-3 py-2 bg-white/10 text-white/60 rounded-xl text-sm flex items-center">
+                            {selectedImage.filename.substring(selectedImage.filename.lastIndexOf('.'))}
+                          </span>
+                        </div>
+                        {filenameError && (
+                          <p className="text-red-400 text-xs">{filenameError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveFilename}
+                            disabled={savingFilename}
+                            className="flex-1 px-4 py-2 bg-gold text-background rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {savingFilename ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                                保存中...
+                              </>
+                            ) : (
+                              '保存'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingFilename(false)
+                              setFilenameError('')
+                            }}
+                            disabled={savingFilename}
+                            className="flex-1 px-4 py-2 bg-white/10 text-white rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            取消
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <div
+                  )}
+
+                  {/* 描述 - 可编辑 */}
+                  {editingDescription && (
+                    <div>
+                      <div className="space-y-2">
+                        <textarea
+                          value={newDescription}
+                          onChange={(e) => setNewDescription(e.target.value)}
+                          placeholder="添加描述..."
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-gold"
+                          rows={2}
+                          disabled={savingDescription}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveDescription}
+                            disabled={savingDescription}
+                            className="flex-1 px-4 py-2 bg-gold text-background rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {savingDescription ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                                保存中...
+                              </>
+                            ) : (
+                              '保存'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingDescription(false)
+                              setNewDescription(selectedImage.description || '')
+                            }}
+                            disabled={savingDescription}
+                            className="flex-1 px-4 py-2 bg-white/10 text-white rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 底部快速操作栏（非编辑状态） */}
+            {!(editingFilename || editingDescription) && (
+              <div className="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent" onClick={(e) => e.stopPropagation()}>
+                <div className="space-y-2">
+                  {/* 文件名和文件信息 */}
+                  <div>
+                    <p className="text-sm text-white font-medium">{selectedImage.filename}</p>
+                    <p className="text-xs text-white/60">
+                      {formatFileSize(selectedImage.size)} · {formatDate(selectedImage.created_at)}
+                    </p>
+                  </div>
+
+                  {/* 快速编辑按钮 */}
+                  <div className="flex gap-2">
+                    <button
                       onClick={() => {
                         setEditingFilename(true)
                         setNewFilename(selectedImage.filename.substring(0, selectedImage.filename.lastIndexOf('.')))
                         setFilenameError('')
                       }}
-                      className="p-3 bg-white/5 rounded-xl cursor-pointer"
+                      className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors"
                     >
-                      <p className="text-sm text-white">{selectedImage.filename}</p>
-                      <p className="text-xs text-white/40">点击编辑文件名</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 文件信息 */}
-                <div>
-                  <p className="text-xs text-white/60">
-                    {formatFileSize(selectedImage.size)} · {formatDate(selectedImage.created_at)}
-                  </p>
-                </div>
-
-                {/* 描述 - 可编辑 */}
-                {editingDescription ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={newDescription}
-                      onChange={(e) => setNewDescription(e.target.value)}
-                      placeholder="添加描述..."
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-gold"
-                      rows={2}
-                      disabled={savingDescription}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleSaveDescription}
-                        disabled={savingDescription}
-                        className="flex-1 px-4 py-2 bg-gold text-background rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {savingDescription ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                            保存中...
-                          </>
-                        ) : (
-                          '保存'
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingDescription(false)
-                          setNewDescription(selectedImage.description || '')
-                        }}
-                        disabled={savingDescription}
-                        className="flex-1 px-4 py-2 bg-white/10 text-white rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        取消
-                      </button>
-                    </div>
+                      编辑文件名
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingDescription(true)
+                        setNewDescription(selectedImage.description || '')
+                      }}
+                      className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors"
+                    >
+                      {selectedImage.description ? '编辑描述' : '添加描述'}
+                    </button>
                   </div>
-                ) : (
-                  <div
-                    onClick={() => {
-                      setEditingDescription(true)
-                      setNewDescription(selectedImage.description || '')
-                    }}
-                    className="p-3 bg-white/5 rounded-xl cursor-pointer"
-                  >
-                    <p className="text-sm text-white">
-                      {selectedImage.description || (
-                        <span className="text-white/40">点击添加描述...</span>
-                      )}
-                    </p>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
