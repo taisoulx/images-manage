@@ -2,12 +2,13 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import fastifyMultipart from '@fastify/multipart'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { join, dirname } from 'path'
+import { existsSync, readFileSync, writeFileSync, createReadStream } from 'fs'
+import { join, dirname, extname } from 'path'
 import os from 'os'
 import { fileURLToPath } from 'url'
 import Database from 'better-sqlite3'
 import { randomBytes } from 'crypto'
+import sharp from 'sharp'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -139,7 +140,57 @@ fastify.get('/api/images/:id', async (request: any, reply: any) => {
   return { image }
 })
 
-// API 端点：获取图片文件
+// API 端点：获取缩略图（优化版）
+fastify.get('/api/images/:id/thumbnail', async (request: any, reply: any) => {
+  const database = getDb()
+  const { id } = request.params
+
+  const image = database.prepare('SELECT path, filename FROM images WHERE id = ?').get(id) as any
+
+  if (!image) {
+    return reply.code(404).send({ error: 'Image not found' })
+  }
+
+  const ext = extname(image.filename).toLowerCase().slice(1)
+  const contentTypes: Record<string, string> = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+    'gif': 'image/gif',
+  }
+  const contentType = contentTypes[ext] || 'image/jpeg'
+
+  // 设置缓存头 - 缩略图可以长期缓存
+  reply.header('Content-Type', contentType)
+  reply.header('Cache-Control', 'public, max-age=31536000, immutable')
+  reply.header('ETag', `"${image.id}-${image.filename}"`)
+
+  // 检查 If-None-Match 头
+  const ifNoneMatch = request.headers['if-none-match']
+  const etag = `"${image.id}-${image.filename}"`
+  if (ifNoneMatch === etag) {
+    return reply.code(304).send()
+  }
+
+  try {
+    // 使用 sharp 生成缩略图：300x300，质量 80%
+    const thumbnail = await sharp(image.path)
+      .resize(300, 300, {
+        fit: 'cover',
+        position: 'center'
+      })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+
+    return reply.send(thumbnail)
+  } catch (err) {
+    console.error('生成缩略图失败:', err)
+    return reply.code(500).send({ error: 'Failed to generate thumbnail' })
+  }
+})
+
+// API 端点：获取原图文件（优化版 - 流式传输 + 缓存）
 fastify.get('/api/images/:id/file', async (request: any, reply: any) => {
   const database = getDb()
   const { id } = request.params
@@ -150,7 +201,7 @@ fastify.get('/api/images/:id/file', async (request: any, reply: any) => {
     return reply.code(404).send({ error: 'Image not found' })
   }
 
-  const ext = image.filename.split('.').pop()?.toLowerCase()
+  const ext = extname(image.filename).toLowerCase().slice(1)
   const contentTypes: Record<string, string> = {
     'jpg': 'image/jpeg',
     'jpeg': 'image/jpeg',
@@ -158,11 +209,23 @@ fastify.get('/api/images/:id/file', async (request: any, reply: any) => {
     'webp': 'image/webp',
     'gif': 'image/gif',
   }
-  const contentType = contentTypes[ext || ''] || 'image/jpeg'
+  const contentType = contentTypes[ext] || 'image/jpeg'
 
-  const data = readFileSync(image.path)
-  reply.type(contentType)
-  return reply.send(data)
+  // 设置缓存头和流式传输
+  reply.header('Content-Type', contentType)
+  reply.header('Cache-Control', 'public, max-age=86400') // 缓存 1 天
+  reply.header('ETag', `"${image.id}-${image.filename}"`)
+
+  // 检查 If-None-Match 头
+  const ifNoneMatch = request.headers['if-none-match']
+  const etag = `"${image.id}-${image.filename}"`
+  if (ifNoneMatch === etag) {
+    return reply.code(304).send()
+  }
+
+  // 使用流式传输
+  const fileStream = createReadStream(image.path)
+  return reply.send(fileStream)
 })
 
 // API 端点：更新图片信息

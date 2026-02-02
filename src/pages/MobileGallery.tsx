@@ -236,7 +236,7 @@ export function MobileGallery() {
                 }}
               >
                 <img
-                  src={`${serverUrl}/api/images/${image.id}/file`}
+                  src={`${serverUrl}/api/images/${image.id}/thumbnail`}
                   alt={image.filename}
                   loading="lazy"
                   className="w-full h-full object-cover"
