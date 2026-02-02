@@ -11,6 +11,9 @@ interface ImageDetailDialogProps {
 export function ImageDetailDialog({ image, isOpen, onClose, onUpdate }: ImageDetailDialogProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [description, setDescription] = useState('')
+  const [filename, setFilename] = useState('')  // 新增
+  const [extension, setExtension] = useState('')  // 新增
+  const [filenameError, setFilenameError] = useState('')  // 新增
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -20,6 +23,17 @@ export function ImageDetailDialog({ image, isOpen, onClose, onUpdate }: ImageDet
       setMounted(true)
       loadImage()
       setDescription(image.description || '')
+
+      // 新增：分割文件名和扩展名
+      const lastDotIndex = image.filename.lastIndexOf('.')
+      if (lastDotIndex > 0) {
+        setFilename(image.filename.substring(0, lastDotIndex))
+        setExtension(image.filename.substring(lastDotIndex))
+      } else {
+        setFilename(image.filename)
+        setExtension('')
+      }
+      setFilenameError('')  // 重置错误
     } else {
       setMounted(false)
       setImageUrl(null)
@@ -46,17 +60,25 @@ export function ImageDetailDialog({ image, isOpen, onClose, onUpdate }: ImageDet
   const handleSave = async () => {
     if (!image) return
 
+    // 验证文件名
+    if (!filename.trim()) {
+      setFilenameError('文件名不能为空')
+      return
+    }
+
     try {
       setSaving(true)
       await invoke('update_image_info', {
         id: image.id,
+        filename: filename.trim(),  // 发送不含扩展名的文件名
         description: description || null
       })
       onUpdate?.()
       onClose()
-    } catch (err) {
+    } catch (err: any) {
       console.error('保存失败:', err)
-      alert('保存失败')
+      // 显示后端返回的错误信息
+      setFilenameError(err.toString() || '保存失败')
     } finally {
       setSaving(false)
     }
@@ -130,10 +152,31 @@ export function ImageDetailDialog({ image, isOpen, onClose, onUpdate }: ImageDet
             <h2 className="font-display text-xl font-bold mb-6">图片信息</h2>
 
             <div className="flex-1 space-y-6 overflow-y-auto">
-              {/* 文件名 */}
+              {/* 文件名 - 可编辑 */}
               <div>
                 <label className="text-sm text-muted-foreground">文件名</label>
-                <p className="font-medium mt-1">{image?.filename}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={filename}
+                    onChange={(e) => {
+                      setFilename(e.target.value)
+                      setFilenameError('')  // 清除错误
+                    }}
+                    placeholder="输入文件名"
+                    className={`flex-1 px-3 py-2 bg-background border rounded-lg focus:border-gold focus:ring-2 focus:ring-gold/20 outline-none transition-all input-focus-effect ${
+                      filenameError ? 'border-destructive' : 'border-border'
+                    }`}
+                  />
+                  {extension && (
+                    <span className="px-3 py-2 bg-muted text-muted-foreground rounded-lg text-sm">
+                      {extension}
+                    </span>
+                  )}
+                </div>
+                {filenameError && (
+                  <p className="text-destructive text-xs mt-1">{filenameError}</p>
+                )}
               </div>
 
               {/* 文件大小 */}
