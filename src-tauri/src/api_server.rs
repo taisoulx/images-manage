@@ -56,7 +56,7 @@ impl From<ImageRecord> for ImageResponse {
 }
 
 struct ServerHandle {
-    local_addr: SocketAddr,
+    _local_addr: SocketAddr,
     shutdown_tx: tokio::sync::oneshot::Sender<()>,
 }
 
@@ -139,7 +139,7 @@ pub fn start_server() -> Result<String, String> {
 
     // 保存服务器句柄
     let server_handle = ServerHandle {
-        local_addr: "0.0.0.0:3000".parse().unwrap(),
+        _local_addr: "0.0.0.0:3000".parse().unwrap(),
         shutdown_tx,
     };
     *handle = Some(server_handle);
