@@ -487,6 +487,19 @@ pub fn delete_image(id: i32) -> Result<(), String> {
 #[command]
 pub fn start_server() -> Result<String, String> {
     use std::process::Command;
+    use std::env;
+
+    // 检查是否在开发环境中运行
+    let is_dev = env::var("TAURI_DEV_MODE").is_ok();
+
+    if !is_dev {
+        return Err(
+            "服务器管理功能仅在开发模式下可用。\\n\\n\
+            生产环境中，请使用以下方式启动 API 服务器：\\n\
+            1. 在项目目录运行: npm run server\\n\
+            2. 或使用 desktop 应用的设置页面启动（开发模式）".to_string()
+        );
+    }
 
     // 检查服务器是否已经在运行
     let mut process = SERVER_PROCESS.lock().unwrap();
@@ -518,7 +531,7 @@ pub fn start_server() -> Result<String, String> {
         let child = Command::new("npm")
             .args(["run", "server"])
             .spawn()
-            .map_err(|e| format!("启动服务器失败: {}", e))?;
+            .map_err(|e| format!("启动服务器失败: {}\\n\\n提示: 请确保 Node.js 和 npm 已正确安装", e))?;
         *process = Some(child);
     }
 
@@ -529,6 +542,17 @@ pub fn start_server() -> Result<String, String> {
 #[command]
 pub fn stop_server() -> Result<String, String> {
     use std::process::Command;
+    use std::env;
+
+    // 检查是否在开发环境中运行
+    let is_dev = env::var("TAURI_DEV_MODE").is_ok();
+
+    if !is_dev {
+        return Err(
+            "服务器管理功能仅在开发模式下可用。\\n\\n\
+            生产环境中 API 服务器需要手动停止。".to_string()
+        );
+    }
 
     let mut process = SERVER_PROCESS.lock().unwrap();
 
@@ -588,7 +612,14 @@ pub fn stop_server() -> Result<String, String> {
 /// 获取服务器状态
 #[command]
 pub fn get_server_status() -> Result<bool, String> {
+    use std::env;
     use std::process::Command;
+
+    // 在生产环境中，总是返回未运行状态
+    let is_dev = env::var("TAURI_DEV_MODE").is_ok();
+    if !is_dev {
+        return Ok(false);
+    }
 
     let process = SERVER_PROCESS.lock().unwrap();
 
