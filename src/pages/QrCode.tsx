@@ -15,6 +15,8 @@ export function QrCode() {
   const [error, setError] = useState('')
   const [mounted, setMounted] = useState(false)
   const [serverRunning, setServerRunning] = useState(false)
+  const [serverLoading, setServerLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -26,12 +28,18 @@ export function QrCode() {
   const checkServerStatus = async () => {
     try {
       const response = await fetch('http://localhost:3000/api/health')
-      setServerRunning(response.ok)
-      if (response.ok) {
+      const isRunning = response.ok
+      setServerRunning(isRunning)
+      if (isRunning) {
         await fetchNetworkInfo()
+        setServerLoading(false)
       }
     } catch (err) {
       setServerRunning(false)
+      // 只有在不是初始加载时才设置 loading false
+      if (!loading) {
+        setServerLoading(false)
+      }
     }
   }
 
@@ -51,23 +59,48 @@ export function QrCode() {
   }
 
   const startServer = async () => {
+    setServerLoading(true)
     try {
-      // 使用 Tauri 命令启动服务器
       const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('start_server')
-      // 等待服务器启动
-      setTimeout(() => {
-        checkServerStatus()
-      }, 2000)
+      const result = await invoke<string>('start_server')
+      console.log('启动结果:', result)
+
+      // 立即检查状态，然后延迟再检查一次确保状态更新
+      await checkServerStatus()
+      setTimeout(() => checkServerStatus(), 1000)
+      setTimeout(() => checkServerStatus(), 2000)
     } catch (err) {
       console.error('启动服务器失败:', err)
-      alert('启动服务器失败，请手动运行 npm run server')
+      setError('启动服务器失败: ' + (err instanceof Error ? err.message : '未知错误'))
+      setServerLoading(false)
+    }
+    // 不在这里设置 loading false，等状态检查完成后再设置
+  }
+
+  const stopServer = async () => {
+    setServerLoading(true)
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const result = await invoke('stop_server')
+      console.log('停止结果:', result)
+      setServerRunning(false)
+      setNetworkInfo(null)
+      setServerLoading(false)
+    } catch (err) {
+      console.error('停止服务器失败:', err)
+      setError('停止服务器失败: ' + (err instanceof Error ? err.message : '未知错误'))
+      setServerLoading(false)
     }
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    alert('已复制到剪贴板')
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('复制失败:', err)
+    }
   }
 
   return (
@@ -81,41 +114,58 @@ export function QrCode() {
           </p>
         </div>
 
-        {/* 服务器状态 */}
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${serverRunning ? 'bg-green-500' : 'bg-destructive'} animate-pulse`} />
-          <span className="text-sm text-muted-foreground">
-            {serverRunning ? '服务运行中' : '服务未启动'}
-          </span>
+        {/* 服务器状态和控制 */}
+        <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
+            serverRunning
+              ? 'bg-green-500/20 text-green-500'
+              : 'bg-destructive/20 text-destructive'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${serverRunning ? 'bg-green-500' : 'bg-destructive'} animate-pulse`} />
+            <span className="text-sm font-medium">
+              {serverRunning ? '运行中' : '未启动'}
+            </span>
+          </div>
+          {serverRunning ? (
+            <button
+              onClick={stopServer}
+              disabled={serverLoading}
+              className="px-4 py-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            >
+              {serverLoading ? '停止中...' : '停止服务器'}
+            </button>
+          ) : (
+            <button
+              onClick={startServer}
+              disabled={serverLoading}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            >
+              {serverLoading ? '启动中...' : '启动服务器'}
+            </button>
+          )}
         </div>
       </div>
 
       {/* 服务器未运行提示 */}
-      {!serverRunning && (
-        <div className="p-6 rounded-xl bg-destructive/10 border border-destructive/20 animate-fade-in" style={{ animationDelay: '100ms', opacity: mounted ? 0 : 1 }}>
+      {!serverRunning && !loading && (
+        <div className="p-6 rounded-xl bg-muted/30 border border-border animate-fade-in" style={{ animationDelay: '100ms', opacity: mounted ? 0 : 1 }}>
           <div className="flex items-start gap-4">
-            <span className="text-3xl">⚠️</span>
+            <span className="text-3xl">📡</span>
             <div>
-              <h3 className="font-semibold text-destructive-foreground mb-2">服务器未启动</h3>
-              <p className="text-sm text-destructive-foreground mb-4">
-                需要先启动 API 服务器才能使用网页端访问功能
+              <h3 className="font-semibold text-foreground mb-2">服务器未启动</h3>
+              <p className="text-sm text-muted-foreground">
+                点击右上角的"启动服务器"按钮来启动 API 服务器，然后即可使用局域网访问功能。
               </p>
-              <button
-                onClick={startServer}
-                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors"
-              >
-                启动服务器
-              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* 加载状态 */}
-      {loading && (
+      {loading && serverRunning && (
         <div className="text-center py-12 animate-fade-in" style={{ animationDelay: '100ms', opacity: mounted ? 0 : 1 }}>
           <div className="w-12 h-12 mx-auto mb-4 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-muted-foreground">正在获取网络信息...</p>
+          <p className="text-muted-foreground">正在获取局域网访问信息...</p>
         </div>
       )}
 
@@ -159,10 +209,10 @@ export function QrCode() {
                   </code>
                   <button
                     onClick={() => copyToClipboard(networkInfo.url)}
-                    className="px-3 py-2 bg-gold text-background rounded-lg hover:bg-gold/90 transition-colors"
+                    className="px-3 py-2 bg-gold text-background rounded-lg hover:bg-gold/90 transition-colors flex items-center gap-2 text-sm font-medium"
                     title="复制"
                   >
-                    📋
+                    {copied ? '✅ 已复制' : '📋 复制'}
                   </button>
                 </div>
               </div>
@@ -257,31 +307,20 @@ export function QrCode() {
         </ul>
       </div>
 
-      {/* 快速复制 */}
-      {networkInfo && (
+      {/* 快速操作 */}
+      {networkInfo && serverRunning && (
         <div className="flex gap-3 animate-fade-in" style={{ animationDelay: '500ms', opacity: mounted ? 0 : 1 }}>
           <button
             onClick={() => copyToClipboard(networkInfo.url)}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-gold to-gold-dark text-background font-semibold rounded-lg hover:shadow-lg hover:shadow-gold/20 transition-all duration-300"
+            className="flex-1 px-6 py-3 bg-gradient-to-r from-gold to-gold-dark text-background font-semibold rounded-lg hover:shadow-lg hover:shadow-gold/20 transition-all duration-300 flex items-center justify-center gap-2"
           >
-            复制访问地址
+            {copied ? '✅ 已复制' : '📋 复制访问地址'}
           </button>
           <button
-            onClick={() => {
-              const shareData = {
-                title: 'Photon 图片管理',
-                text: `扫描二维码或访问: ${networkInfo.url}`,
-                url: networkInfo.url
-              }
-              if (navigator.share) {
-                navigator.share(shareData)
-              } else {
-                copyToClipboard(networkInfo.url)
-              }
-            }}
-            className="flex-1 px-6 py-3 bg-card border border-border rounded-lg hover:border-gold/50 transition-colors"
+            onClick={fetchNetworkInfo}
+            className="px-6 py-3 bg-card border border-border rounded-lg hover:border-gold/50 transition-colors flex items-center gap-2"
           >
-            分享链接
+            🔄 刷新
           </button>
         </div>
       )}
