@@ -1,6 +1,5 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
-use actix_files::Files;
 use std::path::Path;
 use std::fs;
 use std::sync::Mutex;
@@ -70,21 +69,14 @@ pub fn start_server() -> Result<String, String> {
         return Ok("服务器已在运行中".to_string());
     }
 
-    // 获取前端构建目录
-    let dist_dir = config::get_project_dir().join("dist");
-
-    if !dist_dir.exists() {
-        return Err(format!("前端构建目录不存在: {}", dist_dir.display()));
-    }
+    // 注意：在生产环境中，前端由 Tauri webview 加载，不需要 dist 目录
+    // API 服务器只提供 API 接口供局域网设备访问
 
     // 创建运行时
     let rt = tokio::runtime::Runtime::new().map_err(|e| format!("创建运行时失败: {}", e))?;
 
     // 创建 shutdown channel
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-
-    // 克隆 dist_dir 用于 move 到 async 块中
-    let dist_dir_clone = dist_dir.clone();
 
     // 在新线程中运行服务器
     thread::spawn(move || {
@@ -93,8 +85,8 @@ pub fn start_server() -> Result<String, String> {
             let port = 3000;
             let bind_addr = format!("0.0.0.0:{}", port);
 
-            // 构建 Actix Web 服务器
-            let http_server = HttpServer::new(move || {
+            // 构建 Actix Web 服务器（仅 API 接口，不服务前端静态文件）
+            let http_server = HttpServer::new(|| {
                 App::new()
                     .wrap(Cors::permissive())
                     .service(
@@ -109,9 +101,8 @@ pub fn start_server() -> Result<String, String> {
                             .route("/images/{id}", web::put().to(update_image))
                             .route("/images/{id}", web::delete().to(delete_image))
                     )
-                    // 静态文件服务（H5 前端）
-                    .service(Files::new("/", &dist_dir_clone).index_file("index.html"))
-                    .default_service(web::get().to(not_found))
+                    // 404 处理
+                    .default_service(web::route().to(not_found))
             })
             .bind(&bind_addr);
 
