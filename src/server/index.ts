@@ -243,6 +243,7 @@ fastify.put('/api/images/:id', async (request: any, reply: any) => {
 
   let finalFilename = currentImage.filename
   let finalPath = currentImage.path
+  const errors: string[] = []
 
   // 处理文件名更新
   if (filename && filename.trim()) {
@@ -253,7 +254,7 @@ fastify.put('/api/images/:id', async (request: any, reply: any) => {
       return reply.code(400).send({ success: false, error: '文件名不能为空' })
     }
 
-    const { renameSync } = await import('fs')
+    const { renameSync, existsSync } = await import('fs')
     const { dirname, extname } = await import('path')
 
     const oldPath = currentImage.path
@@ -263,29 +264,42 @@ fastify.put('/api/images/:id', async (request: any, reply: any) => {
 
     // 检查文件名是否已存在
     const existing = database.prepare(
-      'SELECT id FROM images WHERE filename = ?1 AND id != ?2'
+      'SELECT id FROM images WHERE filename = ? AND id != ?'
     ).get(newFilename, id) as any
 
     if (existing) {
       return reply.code(409).send({ success: false, error: `文件名 '${newFilename}' 已存在` })
     }
 
-    // 重命名文件
-    try {
-      renameSync(oldPath, newPath)
-      finalFilename = newFilename
-      finalPath = newPath
-    } catch (e: any) {
-      return reply.code(500).send({ success: false, error: `重命名文件失败: ${e.message}` })
+    // 检查源文件是否存在
+    if (!existsSync(oldPath)) {
+      errors.push(`源文件不存在: ${oldPath}`)
+    } else {
+      // 重命名文件
+      try {
+        renameSync(oldPath, newPath)
+        finalFilename = newFilename
+        finalPath = newPath
+      } catch (e: any) {
+        errors.push(`重命名文件失败: ${e.message}`)
+      }
     }
   }
 
-  // 更新数据库
-  database.prepare(
-    'UPDATE images SET filename = ?, path = ?, description = ?, updated_at = datetime(\'now\') WHERE id = ?'
-  ).run(finalFilename, finalPath, description || null, id)
+  // 更新数据库（即使文件重命名失败，也更新数据库）
+  try {
+    database.prepare(
+      'UPDATE images SET filename = ?, path = ?, description = ?, updated_at = datetime(\'now\') WHERE id = ?'
+    ).run(finalFilename, finalPath, description || null, id)
 
-  return { success: true, filename: finalFilename }
+    return {
+      success: true,
+      filename: finalFilename,
+      warnings: errors.length > 0 ? errors : undefined
+    }
+  } catch (e: any) {
+    return reply.code(500).send({ success: false, error: `数据库更新失败: ${e.message}` })
+  }
 })
 
 // API 端点：删除图片
