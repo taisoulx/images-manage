@@ -19,6 +19,16 @@ hex = "0.4"
 dirs = "5.0"
 base64 = "0.22"
 
+# API 服务器依赖
+actix-web = "4"
+actix-cors = "0.7"
+actix-files = "0.6"
+tokio = { version = "1", features = ["full"] }
+env_logger = "0.11"
+mime = "0.1"
+mime_guess = "2"
+imagesize = "0.12"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

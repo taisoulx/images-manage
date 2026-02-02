@@ -4,6 +4,8 @@ mod commands;
 mod config;
 mod database;
 mod image;
+mod upload;
+mod api_server;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
