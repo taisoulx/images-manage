@@ -316,13 +316,24 @@ pub fn update_image_info(id: i32, filename: Option<String>, description: Option<
     let conn = get_connection()
         .map_err(|e| format!("获取数据库连接失败: {}", e))?;
 
+    // 开始事务
+    conn.execute("BEGIN TRANSACTION", [])
+        .map_err(|e| format!("开始事务失败: {}", e))?;
+
     // 获取当前图片信息
-    let current_image = get_image_by_id(id)?;
+    let current_image = match get_image_by_id(id) {
+        Ok(img) => img,
+        Err(e) => {
+            conn.execute("ROLLBACK", []).ok();
+            return Err(e);
+        }
+    };
 
     // 处理文件名更新
     if let Some(new_filename) = filename {
         // 验证文件名不为空
         if new_filename.trim().is_empty() {
+            conn.execute("ROLLBACK", []).ok();
             return Err("文件名不能为空".to_string());
         }
 
@@ -344,26 +355,47 @@ pub fn update_image_info(id: i32, filename: Option<String>, description: Option<
         // 检查文件名是否已存在（排除当前图片）
         let mut existing = conn.prepare(
             "SELECT id FROM images WHERE filename = ?1 AND id != ?2"
-        ).map_err(|e| format!("准备查询失败: {}", e))?;
+        ).map_err(|e| {
+            conn.execute("ROLLBACK", []).ok();
+            format!("准备查询失败: {}", e)
+        })?;
 
         let exists = existing.exists(params![&new_filename_with_ext, id])
-            .map_err(|e| format!("检查文件名是否存在失败: {}", e))?;
+            .map_err(|e| {
+                conn.execute("ROLLBACK", []).ok();
+                format!("检查文件名是否存在失败: {}", e)
+            })?;
 
         if exists {
+            conn.execute("ROLLBACK", []).ok();
             return Err(format!("文件名 '{}' 已存在，请使用其他名称", new_filename_with_ext));
         }
 
         // 重命名文件
         if old_path.exists() {
             let new_path = old_path.with_file_name(&new_filename_with_ext);
+
+            // 转换新路径为字符串，处理非UTF-8字符
+            let new_path_str = new_path.to_str()
+                .ok_or_else(|| {
+                    conn.execute("ROLLBACK", []).ok();
+                    format!("新路径包含无效的UTF-8字符: {:?}", new_path)
+                })?;
+
             fs::rename(&old_path, &new_path)
-                .map_err(|e| format!("重命名文件失败: {}", e))?;
+                .map_err(|e| {
+                    conn.execute("ROLLBACK", []).ok();
+                    format!("重命名文件失败: {}", e)
+                })?;
 
             // 更新数据库
             conn.execute(
                 "UPDATE images SET filename = ?1, path = ?2, updated_at = datetime('now') WHERE id = ?3",
-                params![&new_filename_with_ext, new_path.to_str().unwrap(), id],
-            ).map_err(|e| format!("更新文件名失败: {}", e))?;
+                params![&new_filename_with_ext, new_path_str, id],
+            ).map_err(|e| {
+                conn.execute("ROLLBACK", []).ok();
+                format!("更新文件名失败: {}", e)
+            })?;
         }
     }
 
@@ -375,8 +407,15 @@ pub fn update_image_info(id: i32, filename: Option<String>, description: Option<
         conn.execute(
             "UPDATE images SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
             params![desc_value, id],
-        ).map_err(|e| format!("更新描述失败: {}", e))?;
+        ).map_err(|e| {
+            conn.execute("ROLLBACK", []).ok();
+            format!("更新描述失败: {}", e)
+        })?;
     }
+
+    // 提交事务
+    conn.execute("COMMIT", [])
+        .map_err(|e| format!("提交事务失败: {}", e))?;
 
     Ok(())
 }
