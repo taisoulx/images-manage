@@ -23,7 +23,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Rust
-        uses: dtolnasy/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
 
@@ -72,7 +72,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Rust
-        uses: dtolnasy/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
