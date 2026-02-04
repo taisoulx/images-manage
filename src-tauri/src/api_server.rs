@@ -453,6 +453,38 @@ fn get_all_local_ips() -> Vec<String> {
         }
     }
 
+    // 在 Windows 上使用 ipconfig
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        if let Ok(output) = Command::new("ipconfig")
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut current_adapter = String::new();
+
+            for line in stdout.lines() {
+                // 检测适配器名称
+                if line.trim().ends_with(':') {
+                    current_adapter = line.trim().trim_end_matches(':').to_string();
+                }
+
+                // 检测 IPv4 地址
+                if line.trim().starts_with("IPv4 Address") {
+                    let parts: Vec<&str> = line.split(':').collect();
+                    if parts.len() >= 2 {
+                        let ip = parts[1].trim();
+                        // 过滤掉 127.x.x.x 和 169.254.x.x (APIPA)
+                        if !ip.starts_with("127.") && !ip.starts_with("169.254.") && !ip.is_empty() {
+                            addresses.push(ip.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 在 Linux 上使用 ip 命令
     #[cfg(target_os = "linux")]
     {
